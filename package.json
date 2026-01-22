@@ -21,7 +21,8 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
-    "postinstall": "turbo build --filter=shared --filter=server"
+    "postinstall": "turbo build --filter=shared --filter=server",
+    "start": "cd server && bun run dist/index.js"
   },
   "keywords": [
     "bun",
@@ -33,12 +34,14 @@
   ],
   "devDependencies": {
     "bun-types": "latest",
+    "pg": "^8.17.2",
     "turbo": "^2.6.3"
   },
   "peerDependencies": {
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
     "hono": "^4.11.4"
   }
 }
