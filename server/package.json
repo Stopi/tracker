@@ -1,0 +1,22 @@
+{
+  "name": "server",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "bun --watch run src/index.ts & tsc --watch"
+  },
+  "dependencies": {
+    "@hono/session": "^0.2.0",
+    "hono": "^4.10.8",
+    "ioredis": "^5.9.2",
+    "pg": "^8.17.1",
+    "shared": "workspace:*",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.16.0"
+  }
+}

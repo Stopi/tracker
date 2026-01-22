@@ -1,0 +1,44 @@
+{
+  "name": "tracker",
+  "version": "0.9.5",
+  "description": "A SPA to track things",
+  "author": "Stopi",
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/Stopi/tracker",
+  "packageManager": "bun@1.2.4",
+  "workspaces": [
+    "./server",
+    "./client",
+    "./shared"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:client": "turbo dev --filter=client",
+    "dev:server": "turbo dev --filter=server",
+    "build": "turbo build",
+    "build:client": "turbo build --filter=client",
+    "build:server": "turbo build --filter=server",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "postinstall": "turbo build --filter=shared --filter=server"
+  },
+  "keywords": [
+    "bun",
+    "hono",
+    "react",
+    "vite",
+    "monorepo",
+    "turbo"
+  ],
+  "devDependencies": {
+    "bun-types": "latest",
+    "turbo": "^2.6.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
+  }
+}
