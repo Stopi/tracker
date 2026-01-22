@@ -110,7 +110,9 @@ By default, the server is on http://localhost:3000, while vite runs on
 ### 7. tests
 ```shell
 bun run test
-bun run test:coverage   # <= generate code coverage
+
+cd client
+bun run test:coverage   # <= generate code coverage in client/coverage
 bun run test:report     # <= generate code coverage and open report in browser
 ```
 
