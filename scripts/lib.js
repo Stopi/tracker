@@ -1,16 +1,12 @@
 import * as readline from "node:readline";
+import { stdin as input, stdout as output } from "node:process";
 
-export async function prompt(message, _default = '') {
+export function prompt(message, _default = '') {
+  const rl = readline.createInterface({ input, output });
   return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    rl.question(message, (x) => {
+    rl.question(message, (answer) => {
       rl.close();
-      x = x === undefined ? '' : x.trim();
-      resolve(x === '' ? _default : x);
+      resolve((answer || '').trim() || _default);
     });
   });
 }

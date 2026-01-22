@@ -134,6 +134,7 @@ VITE_SERVER_URL should point to the server URL.
 
 ## tech stack
 The base is a [bhvr](https://github.com/stevedylandev/bhvr) stack.  
+The database used is [PostgreSQL](https://www.postgresql.org/).  
 The user data is filtered with [Zod](https://github.com/colinhacks/zod).  
 I use [shadcn/ui](https://github.com/shadcn-ui/ui) on frontend.  
 The frontend test framework is [Vitest](https://github.com/vitest-dev/vitest).
