@@ -36,21 +36,21 @@ async function main() {
     const envObject = parseEnv(envString);
     DATABASE_URL = envObject.DATABASE_URL;
   } else {
-    genDotEnv(); // this initializes DATABASE_URL too
+    await genDotEnv(); // this initializes DATABASE_URL too
   }
 
   const { Pool } = require('pg');
   const pool = new Pool({ connectionString: DATABASE_URL });
   const client = await pool.connect();
 
-  let db_migration_version, res;
+  let db_migration_version;
   try {
-    res = await client.query("SELECT value FROM info WHERE key = 'db_migration_version'");
+    const res = await client.query("SELECT value FROM info WHERE key = 'db_migration_version'");
     db_migration_version = res.rows[0].value;
   } catch (err) {
     // DATABASE IS EMPTY
     const sqlFile = fs.readFileSync(path.join(db_path, './init.sql'), 'utf8');
-    res = await client.query(sqlFile)
+    await client.query(sqlFile);
     db_migration_version++;
   }
 
