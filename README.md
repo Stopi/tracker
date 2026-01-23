@@ -143,7 +143,7 @@ The database used is [PostgreSQL](https://www.postgresql.org/).
 The session data is persisted in [Redis](https://redis.io/).  
 The user data is filtered with [Zod](https://github.com/colinhacks/zod).  
 The **RESTful API** from the server is consumed by [SWR](https://github.com/vercel/swr).  
-[Hono RPC](https://hono.dev/docs/guides/rpc) ensure type safety between server and client.
+[Hono RPC](https://hono.dev/docs/guides/rpc) ensure type safety between server and client.  
 I use [shadcn/ui](https://github.com/shadcn-ui/ui) on frontend.  
 The frontend test framework is [Vitest](https://github.com/vitest-dev/vitest).
 
