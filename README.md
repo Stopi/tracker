@@ -61,6 +61,9 @@ Here's a few more ideas for the future:
 
 ## steps to build the app
 
+You will need to install a PostgreSQL database and a Redis server.  
+They can live in containers.
+
 ### 1. get an API key from TMDB
 
 1. sign-in https://www.themoviedb.org  
@@ -86,8 +89,6 @@ Replace the placeholders (db_user, db_pass, db_name).
 #### opinionated note
 I **HATE** when open source project expect you to run a script **as root** or when a script asks for your **db master password**.  
 You'll have to do it manually.
-
-You can also use a containerized db.
 
 ### 4. initialize the app
 ```shell
@@ -125,8 +126,10 @@ DATABASE_URL=postgresql://db_user:db_password@db_host:db_port/db_name
 AUTH_SECRET=<secret_passphrase_for_redis___32_chars_minimum>
 TMDB_API_KEY=<api_key_from_tmdb___32_chars>
 CORS_ORIGIN=http://localhost:5173
+REDIS_URL=redis://localhost:6379
 ```
-CORS_ORIGIN should point to the frontend URL.
+CORS_ORIGIN should point to the frontend URL, default is http://localhost:5173.  
+REDIS_URL should point to the Redis server, default is redis://localhost:6379.
 
 #### 2. `client/.env`
 ```
@@ -137,7 +140,10 @@ VITE_SERVER_URL should point to the server URL.
 ## tech stack
 The base is a [bhvr](https://github.com/stevedylandev/bhvr) stack.  
 The database used is [PostgreSQL](https://www.postgresql.org/).  
+The session data is persisted in [Redis](https://redis.io/).  
 The user data is filtered with [Zod](https://github.com/colinhacks/zod).  
+The **RESTful API** from the server is consumed by [SWR](https://github.com/vercel/swr).  
+[Hono RPC](https://hono.dev/docs/guides/rpc) ensure type safety between server and client.
 I use [shadcn/ui](https://github.com/shadcn-ui/ui) on frontend.  
 The frontend test framework is [Vitest](https://github.com/vitest-dev/vitest).
 
