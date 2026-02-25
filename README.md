@@ -37,7 +37,6 @@ Here's a few more ideas for the future:
   - languages
   - subtitles
 - saving images locally instead of getting them from TMDB (to allow offline consultation).
-- allow deleting a show
 
 
 # What could be improved (technically)
