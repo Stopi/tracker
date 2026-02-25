@@ -2,11 +2,13 @@ import {useState} from "react";
 import {useOutletContext, useParams} from "react-router";
 import {toast} from "sonner";
 import {api} from "@/lib/api.tsx";
-import {Hourglass, RefreshCw} from "lucide-react";
+import {Hourglass, RefreshCw, Trash} from "lucide-react";
 import {TMDB_IMAGE_URL_PREFIX} from "@/const";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Checkbox} from "@/components/ui/checkbox";
 import {useApi} from "@/lib/swr";
+import { useNavigate } from "react-router";
+import { mutate as globalMutate } from "swr";
 
 type Episode = {
   id: number;
@@ -57,6 +59,7 @@ export default function ShowDetail() {
   const { showId } = useParams();
   const { userFlags } = useOutletContext<ShowContext>();
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const navigate = useNavigate();
 
   // Fetch show data; null key skips fetch when no showId is selected
   const { data, isLoading, isValidating, mutate } = useApi<ShowData>(
@@ -210,6 +213,51 @@ export default function ShowDetail() {
     }
   }
 
+  /**
+   * Deletes the show, updates both SWR caches (detail & list)
+   * optimistically, and prevents useless server refetches.
+   */
+  async function handleDelete() {
+    if (!window.confirm(`Are you sure you want to delete "${show?.name}"?`)) {
+      return;
+    }
+
+    try {
+      // 1. Call HonoRPC delete endpoint
+      // @ts-expect-error - Hono RPC doesn't type dynamic params
+      const res = await api.show[showId].$delete();
+
+      if (res.ok) {
+        toast.success("Show deleted");
+
+        // 2. Clear THIS component's cache immediately and do not refetch (false)
+        await mutate(undefined, { revalidate: false });
+
+        // 3. Reach up to the parent ShowsLayout cache and remove the show.
+        // Then we prevent SWR from refetching the list!
+        await globalMutate(
+          "/show",
+          (currentData: ShowContext | undefined) => {
+            if (!currentData || !currentData.shows) return currentData;
+            return {
+              ...currentData,
+              shows: currentData.shows.filter((s) => String(s.id) !== String(showId)),
+            };
+          },
+          { revalidate: false }
+        );
+
+        // 4. Redirect to the empty shows layout
+        navigate("/");
+      } else {
+        toast.error("Failed to delete the show");
+      }
+    } catch (e) {
+      toast.error("An error occurred while deleting the show");
+      console.error(e);
+    }
+  }
+
   /** Determines season checkbox state based on episode flag coverage */
   function isSeasonFlagChecked(flag: string): boolean | "indeterminate" | undefined {
     const seasonEps = currentSeasonEpisodes.filter((ep) => ep[flag as keyof Episode] !== undefined);
@@ -250,7 +298,19 @@ export default function ShowDetail() {
             </div>
           </div>
           <div className="flex flex-col xl:flex-2 h-full items-center xl:items-start overflow-y-auto px-8 my-8 xl:my-0">
-            <div className='flex gap-4 items-center w-fit'>
+            <h1 className="text-xl lg:text-3xl font-bold">{show.name}</h1>
+            <div className='flex gap-4 items-center w-fit mb-4 mt-2'>
+              <div className="flex flex-wrap gap-2 w-fit lg:gap-4 text-xs lg:text-sm text-muted-foreground">
+                <span>
+                  {show.nb_seasons} season{show.nb_seasons ?? 0 > 1 ? "s" : ""}
+                </span>
+                <span>
+                  {show.nb_episodes} episode
+                  {show.nb_episodes ?? 0 > 1 ? "s" : ""}
+                </span>
+                <span>{show.origin_country}</span>
+                <span>{show.status}</span>
+              </div>
               <button
                 className="cursor-pointer shrink-0"
                 onClick={() => handleRefresh()}
@@ -261,18 +321,13 @@ export default function ShowDetail() {
                   : (<RefreshCw />)
                 }
               </button>
-              <h1 className="text-xl lg:text-3xl font-bold">{show.name}</h1>
-            </div>
-            <div className="flex flex-wrap gap-2 w-fit lg:gap-4 text-xs lg:text-sm text-muted-foreground mb-4 mt-2">
-              <span>
-                {show.nb_seasons} season{show.nb_seasons ?? 0 > 1 ? "s" : ""}
-              </span>
-              <span>
-                {show.nb_episodes} episode
-                {show.nb_episodes ?? 0 > 1 ? "s" : ""}
-              </span>
-              <span>{show.origin_country}</span>
-              <span>{show.status}</span>
+              <button
+                className="cursor-pointer shrink-0"
+                onClick={() => handleDelete()}
+                title="Delete this show"
+              >
+                <Trash />
+              </button>
             </div>
             <p className="text-muted-foreground text-sm lg:text-base text-justify">{show.overview}</p>
           </div>

@@ -139,5 +139,12 @@ const Show = {
     return res;
   },
 
+  delete: async (id:number): Promise<boolean> => {
+    let res = await DB.query('DELETE FROM u_show WHERE show_id = $1', [id]);
+    res = res && await DB.query('DELETE FROM episode WHERE show_id = $1', [id]);
+    res = res && await DB.query('DELETE FROM show WHERE id = $1', [id]);
+    return res;
+  },
+
 };
 export default Show;

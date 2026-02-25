@@ -57,5 +57,11 @@ const show = new Hono<{ Variables: { userId: number } }>()
       return c.json({ success: res });
     }
   )
+  .delete("/:id", async (c) => {
+// return c.json({ success: true });
+    const id = Number(c.req.param("id"));
+    const res = await Show.delete(id);
+    return c.json({ success: res });
+  })
 ;
 export default show;
