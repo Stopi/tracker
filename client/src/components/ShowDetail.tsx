@@ -1,14 +1,12 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {useOutletContext, useParams} from "react-router";
+import {useNavigate} from "react-router";
 import {toast} from "sonner";
 import {api} from "@/lib/api.tsx";
 import {Hourglass, RefreshCw, Trash} from "lucide-react";
 import {TMDB_IMAGE_URL_PREFIX} from "@/const";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Checkbox} from "@/components/ui/checkbox";
-import {useApi} from "@/lib/swr";
-import { useNavigate } from "react-router";
-import { mutate as globalMutate } from "swr";
 
 type Episode = {
   id: number;
@@ -35,6 +33,7 @@ type ShowContext = {
     name: string;
   }>;
   userFlags: Record<string, string>;
+  refreshShows: () => Promise<void>;
 };
 
 type ShowData = {
@@ -51,43 +50,54 @@ type ShowData = {
   };
 };
 
-/**
- * Show detail view displaying metadata and episode list with flag management.
- * Supports per-episode and per-season flag toggles with optimistic updates.
- */
 export default function ShowDetail() {
   const { showId } = useParams();
-  const { userFlags } = useOutletContext<ShowContext>();
+  const { userFlags, refreshShows } = useOutletContext<ShowContext>();
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const [show, setShow] = useState<ShowData["show"] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch show data; null key skips fetch when no showId is selected
-  const { data, isLoading, isValidating, mutate } = useApi<ShowData>(
-    showId ? `/show/${showId}` : null,
-    showId
-      ? // @ts-expect-error - Hono RPC doesn't support dynamic index access at type level
-        () => api.show[showId].$get()
-      : null
-  );
-
-  const show = data?.show ?? null;
-
-  // Render states based on loading and data availability
-  if (isLoading && !show) {
-    return (
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+  async function fetchShow() {
+    if (!showId) return;
+    setIsLoading(true);
+    try {
+      // @ts-expect-error - Hono RPC doesn't support dynamic index access at type level
+      const res = await api.show[showId].$get();
+      if (res.ok) {
+        const data: ShowData = await res.json();
+        setShow(data.show);
+      } else {
+        setShow(null);
+      }
+    } catch {
+      setShow(null);
+    } finally {
+      setIsLoading(false);
+    }
   }
+
+  useEffect(() => {
+    fetchShow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showId]);
 
   if (!showId) {
     return (
       <div className="flex-1 overflow-y-auto p-6">
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">Select a show to view details</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading && !show) {
+    return (
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -103,151 +113,74 @@ export default function ShowDetail() {
     );
   }
 
-  /** Refreshes show's details and list of episodes from TMDB */
   async function handleRefresh() {
     if (isValidating) return;
+    setIsValidating(true);
     try {
-      await mutate();
+      // @ts-expect-error - Hono RPC doesn't type dynamic params
+      const res = await api.show[showId].$put();
+      if (!res.ok) {
+        toast.error("Failed to refresh show");
+        return;
+      }
+      await fetchShow();
       toast.success("Show refreshed");
     } catch {
       toast.error("Failed to refresh show");
+    } finally {
+      setIsValidating(false);
     }
   }
 
-  /**
-   * Toggles a single episode flag with optimistic update.
-   * Reverts on server error.
-   */
   async function handleFlagChange(episodeId: number, flag: string, checked: boolean) {
     const flagLabel = userFlags[flag] || flag;
     const episodeName = show?.episodes?.find((ep) => ep.id === episodeId)?.name || "Episode";
 
-    // Apply change immediately to UI
-    await mutate(
-      (currentData) => {
-        if (!currentData) return currentData;
-        return {
-          ...currentData,
-          show: {
-            ...currentData.show,
-            episodes: currentData.show.episodes?.map((ep) =>
-              ep.id === episodeId ? { ...ep, [flag]: checked } : ep
-            ),
-          },
-        };
-      },
-      false
-    );
-
-    // @ts-expect-error - Hono RPC doesn't type dynamic params
-    const res = await api.episode[episodeId].flag.$patch({
-      json: { flag, value: checked },
-    });
-    if (!res.ok) {
-      // Revert on failure
-      await mutate(
-        (currentData) => {
-          if (!currentData) return currentData;
-          return {
-            ...currentData,
-            show: {
-              ...currentData.show,
-              episodes: currentData.show.episodes?.map((ep) =>
-                ep.id === episodeId ? { ...ep, [flag]: !checked } : ep
-              ),
-            },
-          };
-        },
-        false
-      );
+    try {
+      // @ts-expect-error - Hono RPC doesn't type dynamic params
+      const res = await api.episode[episodeId].flag.$patch({
+        json: { flag, value: checked },
+      });
+      if (!res.ok) {
+        toast.error(`Failed to update ${flagLabel} for ${episodeName}`);
+        return;
+      }
+      await fetchShow();
+    } catch {
       toast.error(`Failed to update ${flagLabel} for ${episodeName}`);
     }
   }
 
-  /**
-   * Toggles flags for all episodes in the current season.
-   * Applies change to matching episodes and reverts on error.
-   */
   async function handleSeasonFlagChange(flag: string, checked: boolean) {
     const flagLabel = userFlags[flag] || flag;
 
-    // Apply to all episodes in current season
-    await mutate(
-      (currentData) => {
-        if (!currentData) return currentData;
-        return {
-          ...currentData,
-          show: {
-            ...currentData.show,
-            episodes: currentData.show.episodes?.map((ep) =>
-              ep.season_nb === selectedSeason ? { ...ep, [flag]: checked } : ep
-            ),
-          },
-        };
-      },
-      false
-    );
-
-    // @ts-expect-error - Hono RPC doesn't type dynamic params
-    const res = await api.show[show.id].season.flag.$patch({
-      json: { season_nb: selectedSeason, flag, value: checked },
-    });
-    if (!res.ok) {
-      // Revert on failure
-      await mutate(
-        (currentData) => {
-          if (!currentData) return currentData;
-          return {
-            ...currentData,
-            show: {
-              ...currentData.show,
-              episodes: currentData.show.episodes?.map((ep) =>
-                ep.season_nb === selectedSeason ? { ...ep, [flag]: !checked } : ep
-              ),
-            },
-          };
-        },
-        false
-      );
+    try {
+      // @ts-expect-error - Hono RPC doesn't type dynamic params
+      const res = await api.show[showId].season.flag.$patch({
+        json: { season_nb: selectedSeason, flag, value: checked },
+      });
+      if (!res.ok) {
+        toast.error(`Failed to update ${flagLabel} for season ${selectedSeason}`);
+        return;
+      }
+      await fetchShow();
+    } catch {
       toast.error(`Failed to update ${flagLabel} for season ${selectedSeason}`);
     }
   }
 
-  /**
-   * Deletes the show, updates both SWR caches (detail & list)
-   * optimistically, and prevents useless server refetches.
-   */
   async function handleDelete() {
     if (!window.confirm(`Are you sure you want to delete "${show?.name}"?`)) {
       return;
     }
 
     try {
-      // 1. Call HonoRPC delete endpoint
       // @ts-expect-error - Hono RPC doesn't type dynamic params
       const res = await api.show[showId].$delete();
-
       if (res.ok) {
         toast.success("Show deleted");
-
-        // 2. Clear THIS component's cache immediately and do not refetch (false)
-        await mutate(undefined, { revalidate: false });
-
-        // 3. Reach up to the parent ShowsLayout cache and remove the show.
-        // Then we prevent SWR from refetching the list!
-        await globalMutate(
-          "/show",
-          (currentData: ShowContext | undefined) => {
-            if (!currentData || !currentData.shows) return currentData;
-            return {
-              ...currentData,
-              shows: currentData.shows.filter((s) => String(s.id) !== String(showId)),
-            };
-          },
-          { revalidate: false }
-        );
-
-        // 4. Redirect to the empty shows layout
+        setShow(null);
+        await refreshShows();
         navigate("/");
       } else {
         toast.error("Failed to delete the show");
@@ -258,7 +191,6 @@ export default function ShowDetail() {
     }
   }
 
-  /** Determines season checkbox state based on episode flag coverage */
   function isSeasonFlagChecked(flag: string): boolean | "indeterminate" | undefined {
     const seasonEps = currentSeasonEpisodes.filter((ep) => ep[flag as keyof Episode] !== undefined);
     if (seasonEps.length === 0) return undefined;
@@ -276,9 +208,8 @@ export default function ShowDetail() {
 
   return (
     <div className="w-full h-full overflow-y-auto xl:overflow-hidden">
-      <div className="flex flex-col xl:flex-row px-4 xl:px-6 pr-0 w-full h-fit xl:h-full"> {/* two containers are needed here because cannot cumulate flex+h-fit+overflow */}
+      <div className="flex flex-col xl:flex-row px-4 xl:px-6 pr-0 w-full h-fit xl:h-full">
 
-        {/* Show metadata and poster */}
         <div className="flex flex-col xl:flex-row items-center w-full xl:w-2/3 h-fit xl:h-full overflow-hidden">
           <div className="xl:grow-0 w-fit xl:w-[34%] h-fit xl:h-full">
             <div className="xl:w-full h-fit xl:h-full text-center">
@@ -333,7 +264,6 @@ export default function ShowDetail() {
           </div>
         </div>
 
-        {/* Episode browser with season tabs */}
         <div className="w-full h-fit xl:h-full xl:w-1/3 mt-4 xl:mt-0 border-t xl:border-t-0 xl:border-l">
           <Tabs value={String(selectedSeason)} onValueChange={(v) => setSelectedSeason(Number(v))} className="overflow-hidden h-fit xl:h-full">
             <TabsList className="w-full justify-start overflow-x-auto">
@@ -345,7 +275,6 @@ export default function ShowDetail() {
             </TabsList>
             {seasons.map((season) => (
               <TabsContent key={season} value={String(season)} className="flex flex-col items-center xl:items-start overflow-hidden h-fit xl:h-full">
-                {/* Season-level flag toggles */}
                 <div className="flex grow-0 flex-wrap gap-2 p-2 border-b mb-2 w-fit text-muted-foreground text-xs lg:text-sm">
                   <span className="self-center">Season flags:</span>
                   {Object.entries(userFlags).map(

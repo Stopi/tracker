@@ -12,7 +12,7 @@ const app = new Hono<{ Variables: { session: Session<UserSessionData>, userId: n
   .use(
     "*",
     cors({
-      origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+      origin: process.env.CORS_ORIGIN || "http://localhost:4002",
       credentials: true,
     })
   )

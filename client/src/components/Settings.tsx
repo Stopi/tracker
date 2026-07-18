@@ -1,10 +1,9 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {toast} from "sonner";
 import {api} from "@/lib/api.tsx";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {useApi} from "@/lib/swr";
 
 type SettingsData = {
 	flag_1: string;
@@ -28,35 +27,35 @@ const defaultFlags: SettingsData = {
 	flag_8: "",
 };
 
-/**
- * Settings page for configuring custom flag labels.
- * Flags are user-defined labels for tracking episode states (e.g., Watched, Downloaded).
- */
 export default function Settings() {
 	const [isSaving, setIsSaving] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+	const [flags, setFlags] = useState<SettingsData>(defaultFlags);
 
-	const { data, isLoading, mutate } = useApi<SettingsData>(
-		"/settings",
-		() => api.settings.$get()
-	);
+	useEffect(() => {
+		async function fetchSettings() {
+			try {
+				const res = await api.settings.$get();
+				if (res.ok) {
+					const data: SettingsData = await res.json();
+					setFlags(data);
+				}
+			} catch {
+				// Keep defaults
+			} finally {
+				setIsLoading(false);
+			}
+		}
+		fetchSettings();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
-	const flags = data ?? defaultFlags;
-
-	/** Updates local form state immediately (optimistic UI) */
 	function updateFlag(key: keyof SettingsData, value: string) {
-		mutate(
-			(currentData) => {
-				if (!currentData) return { ...defaultFlags, [key]: value };
-				return { ...currentData, [key]: value };
-			},
-			false
-		);
+		setFlags((prev) => ({ ...prev, [key]: value }));
 	}
 
-	/** Persists flag labels to server */
 	async function handleSave() {
 		setIsSaving(true);
-
 		try {
 			const res = await api.settings.$patch({ json: flags });
 			if (res.ok) {

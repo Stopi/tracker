@@ -106,7 +106,7 @@ This script will help to initialize the server/.env and the DB.
 ```shell
 bun run dev
 ```
-By default, the server is on http://localhost:3000, while vite runs on 
+By default, the server is on http://localhost:3000, while the client runs on http://localhost:4002
 
 ### 7. tests
 ```shell
@@ -125,10 +125,10 @@ You can edit the .env files:
 DATABASE_URL=postgresql://db_user:db_password@db_host:db_port/db_name
 AUTH_SECRET=<secret_passphrase_for_redis___32_chars_minimum>
 TMDB_API_KEY=<api_key_from_tmdb___32_chars>
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:4002
 REDIS_URL=redis://localhost:6379
 ```
-CORS_ORIGIN should point to the frontend URL, default is http://localhost:5173.  
+CORS_ORIGIN should point to the frontend URL, default is http://localhost:4002.  
 REDIS_URL should point to the Redis server, default is redis://localhost:6379.
 
 #### 2. `client/.env`
@@ -142,8 +142,7 @@ The base is a [bhvr](https://github.com/stevedylandev/bhvr) stack.
 The database used is [PostgreSQL](https://www.postgresql.org/).  
 The session data is persisted in [Redis](https://redis.io/).  
 The user data is filtered with [Zod](https://github.com/colinhacks/zod).  
-The **RESTful API** from the server is consumed by [SWR](https://github.com/vercel/swr).  
-[Hono RPC](https://hono.dev/docs/guides/rpc) ensure type safety between server and client.  
+[Hono RPC](https://hono.dev/docs/guides/rpc) ensures type safety between server and client.  
 I use [shadcn/ui](https://github.com/shadcn-ui/ui) on frontend.  
 The frontend test framework is [Vitest](https://github.com/vitest-dev/vitest).
 

@@ -4,16 +4,13 @@ import userEvent from '@testing-library/user-event';
 import {MemoryRouter} from 'react-router';
 import ShowList from '@/components/Shows';
 
-// Mock the API module (needed for Dialog imports)
 vi.mock('@/lib/api.tsx', () => ({
   api: {
     show: {
       $get: vi.fn(),
       $post: vi.fn(),
       search: {
-        $: {
-          get: vi.fn(),
-        },
+        $get: vi.fn(),
       },
     },
   },

@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import {AuthProvider} from '@/components/auth/AuthProvider.tsx';
 import {useAuth} from "@/components/auth/useAuth.tsx";
 
-// Create mock functions with getters for vi.mock hoisting
 const mocks: {
   sessionGet: ReturnType<typeof vi.fn>;
   sessionDelete: ReturnType<typeof vi.fn>;
@@ -13,17 +12,16 @@ const mocks: {
   sessionDelete: vi.fn(),
 };
 
-// Mock the API
+function mockResponse(data: unknown) {
+  return { ok: true, json: () => Promise.resolve(data) };
+}
+
 vi.mock('@/lib/api.tsx', () => ({
   get api() {
     return {
       session: {
-        get $get() {
-          return mocks.sessionGet;
-        },
-        get $delete() {
-          return mocks.sessionDelete;
-        },
+        $get: mocks.sessionGet,
+        $delete: mocks.sessionDelete,
       },
     };
   },
@@ -36,7 +34,6 @@ describe('lib/AuthProvider.tsx', () => {
 
   describe('AuthProvider', () => {
     it('shows loading state initially', () => {
-      // Pending forever - never resolves
       mocks.sessionGet.mockImplementation(() => new Promise(() => {}));
 
       render(
@@ -45,15 +42,11 @@ describe('lib/AuthProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Provider renders children immediately
       expect(screen.getByText('Child')).toBeInTheDocument();
     });
 
     it('sets user and isAuthenticated on successful session', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, username: 'testuser' } }),
-      });
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1, username: 'testuser' } }));
 
       render(
         <AuthProvider>
@@ -69,10 +62,7 @@ describe('lib/AuthProvider.tsx', () => {
     });
 
     it('clears authentication on failed session', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
-      });
+      mocks.sessionGet.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Unauthorized' }) });
 
       render(
         <AuthProvider>
@@ -103,11 +93,7 @@ describe('lib/AuthProvider.tsx', () => {
     });
 
     it('login updates authentication state', async () => {
-      // Start with no session
-      mocks.sessionGet.mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
-      });
+      mocks.sessionGet.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Unauthorized' }) });
 
       render(
         <AuthProvider>
@@ -115,12 +101,10 @@ describe('lib/AuthProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial render
       await waitFor(() => {
         expect(screen.getByTestId('isAuthenticated')).toHaveTextContent('false');
       });
 
-      // Simulate login
       const loginFn = screen.getByTestId('login-fn');
       await userEvent.click(loginFn);
 
@@ -131,11 +115,7 @@ describe('lib/AuthProvider.tsx', () => {
     });
 
     it('logout calls API and clears state', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, username: 'testuser' } }),
-      });
-
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1, username: 'testuser' } }));
       mocks.sessionDelete.mockResolvedValue(new Response(null, { status: 200 }));
 
       render(
@@ -144,7 +124,6 @@ describe('lib/AuthProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for authenticated state
       await waitFor(() => {
         expect(screen.getByTestId('isAuthenticated')).toHaveTextContent('true');
       });
@@ -174,10 +153,7 @@ describe('lib/AuthProvider.tsx', () => {
     });
 
     it('returns auth context values when inside provider', () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, username: 'test' } }),
-      });
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1, username: 'test' } }));
 
       render(
         <AuthProvider>
@@ -188,7 +164,6 @@ describe('lib/AuthProvider.tsx', () => {
   });
 });
 
-// Helper component to consume auth context
 function AuthConsumer() {
   const { isAuthenticated, login, logout, isLoading, user } = useAuth();
 

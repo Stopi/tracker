@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Link, useNavigate, useOutlet, useParams} from "react-router";
 import {toast} from "sonner";
 import {api} from "@/lib/api.tsx";
@@ -9,11 +9,16 @@ import {Accordion, AccordionContent, AccordionItem, AccordionTrigger,} from "@/c
 import {TMDB_IMAGE_URL_PREFIX} from "@/const";
 import {Plus} from "lucide-react";
 import {ErrorBoundary} from "@/components/ErrorBoundary";
-import {useApi} from "@/lib/swr";
 
-type ResponseType = Awaited<ReturnType<typeof api.show.$get>>;
-type ShowsResponse = Awaited<ReturnType<ResponseType["json"]>>;
-type Show = ShowsResponse["shows"][number];
+type Show = {
+  id: number;
+  tmdb_id: number;
+  name: string;
+  network?: string;
+  nb_seasons?: number;
+  image?: string;
+  overview?: string;
+};
 
 type SearchResult = {
   id: number;
@@ -31,16 +36,36 @@ type ShowsData = {
 };
 
 export function ShowsLayout() {
-  const { data, error, isLoading, mutate } = useApi<ShowsData>("/show", () => api.show.$get());
+  const [shows, setShows] = useState<Show[]>([]);
+  const [userFlags, setUserFlags] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchShows = async () => {
+    try {
+      const res = await api.show.$get();
+      if (!res.ok) throw new Error("Failed to load shows");
+      const data: ShowsData = await res.json();
+      setShows(data.shows);
+      setUserFlags(data.userFlags);
+      setError(null);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const outlet = useOutlet({
-    shows: data?.shows || [],
-    userFlags: data?.userFlags || {},
+    shows,
+    userFlags,
+    refreshShows: fetchShows,
   });
-
-  const refreshShows = async () => {
-    await mutate();
-  };
 
   if (isLoading) {
     return (
@@ -66,8 +91,8 @@ export function ShowsLayout() {
     <div className="flex flex-col md:flex-row h-fit md:h-full overflow-hidden">
       <ErrorBoundary fallback={<div className="w-full md:w-80 border-r p-4 text-red-500">Failed to load shows</div>}>
         <ShowList
-          shows={data?.shows || []}
-          onRefreshShows={refreshShows}
+          shows={shows}
+          onRefreshShows={fetchShows}
         />
       </ErrorBoundary>
       <ErrorBoundary fallback={<div className="flex-1 p-4 text-red-500">Failed to load content</div>}>
@@ -97,7 +122,6 @@ export default function ShowList({ shows, onRefreshShows }: ShowListProps) {
     (show.name || "").toLowerCase().includes(filterQuery.toLowerCase())
   );
 
-  /** Searches TMDB for shows matching the query */
   async function handleSearch() {
     if (!searchQuery.trim()) return;
 
@@ -117,7 +141,6 @@ export default function ShowList({ shows, onRefreshShows }: ShowListProps) {
     }
   }
 
-  /** Adds a show to the user's library and navigates to its detail page */
   async function handleAddShow(show: SearchResult) {
     try {
       setIsAdding(true);
@@ -143,7 +166,6 @@ export default function ShowList({ shows, onRefreshShows }: ShowListProps) {
 
   return (
     <div className="flex flex-col w-full md:w-80 border-r h-80 md:h-full mb-8 md:mb-0">
-      {/* Header with Add button */}
       <div className="border-b">
         <div className="flex items-center justify-between mb-2">
           <Input
@@ -244,7 +266,6 @@ export default function ShowList({ shows, onRefreshShows }: ShowListProps) {
         </div>
       </div>
 
-      {/* Shows list */}
       <div className="flex-1 overflow-y-auto">
         {filteredShows.length === 0 ? (
           <div className="p-4 text-muted-foreground text-center">

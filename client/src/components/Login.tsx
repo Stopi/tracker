@@ -15,10 +15,6 @@ import {useAuth} from "@/components/auth/useAuth.tsx";
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
-/**
- * Login form component that authenticates users via session API.
- * On success, initializes auth state, applies stored theme, and redirects home.
- */
 function Login() {
   const { login } = useAuth()
   const { setThemeState } = useTheme()
@@ -34,7 +30,6 @@ function Login() {
     },
   })
 
-  /** Handles form submission: authenticates user and initializes app state */
   async function onSubmit(formData: LoginFormValues) {
     setIsLoading(true)
     setError(null)
@@ -48,7 +43,6 @@ function Login() {
       })
 
       if (!res.ok) {
-        // Display server-provided error or fallback message
         const errorData = await res.json();
         const message = (errorData as { message?: string }).message || "Invalid username or password"
         setError(message)
@@ -57,14 +51,11 @@ function Login() {
       }
 
       const data = await res.json();
-      // Initialize authenticated session state
       login(data.user)
-      // Apply user's preferred theme before rendering protected routes
       setThemeState(data.darkTheme)
       toast.success("Welcome back!")
       navigate("/", { replace: true })
     } catch (err) {
-      // Network errors or unexpected failures
       const message = "An error occurred. Please try again."
       setError(message)
       toast.error(message)

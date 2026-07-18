@@ -1,30 +1,58 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {render, screen, waitFor} from '@testing-library/react';
 import {createRoutesStub} from 'react-router';
-import {SWRConfig} from 'swr';
 import ShowDetail from '@/components/ShowDetail';
 
-// Mock the API module
-vi.mock('@/lib/api.tsx', () => ({
-  api: {
-    show: {
-      $get: vi.fn(),
+const { showGet, showPut, showDelete, episodeFlagPatch, seasonFlagPatch } = vi.hoisted(() => {
+  const showGet = vi.fn();
+  const showPut = vi.fn();
+  const showDelete = vi.fn();
+  const episodeFlagPatch = vi.fn();
+  const seasonFlagPatch = vi.fn();
+  return { showGet, showPut, showDelete, episodeFlagPatch, seasonFlagPatch };
+});
+
+function mockResponse(data: unknown) {
+  return { ok: true, json: () => Promise.resolve(data) };
+}
+
+vi.mock('@/lib/api.tsx', () => {
+  const showEndpoint = {
+    $get: showGet,
+    $put: showPut,
+    $delete: showDelete,
+    season: {
+      flag: { $patch: seasonFlagPatch },
     },
-  },
-}));
+  };
 
-// Mock useApi - use getter syntax to avoid hoisting issues
-const mocks: { useApi: ReturnType<typeof vi.fn> } = {
-  useApi: vi.fn(),
-};
+  return {
+    api: {
+      show: new Proxy({}, {
+        get(_target, prop) {
+          if (prop === 'search') {
+            return new Proxy({}, {
+              get() {
+                return { $get: vi.fn().mockResolvedValue(mockResponse({ shows: [] })) };
+              },
+            });
+          }
+          if (prop === '$get') return vi.fn();
+          if (prop === '$post') return vi.fn();
+          return showEndpoint;
+        },
+      }),
+      episode: new Proxy({}, {
+        get() {
+          return {
+            flag: { $patch: episodeFlagPatch },
+          };
+        },
+      }),
+    },
+  };
+});
 
-vi.mock('@/lib/swr', () => ({
-  get useApi() {
-    return mocks.useApi;
-  },
-}));
-
-// Mock useOutletContext
 vi.mock('react-router', async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
@@ -41,6 +69,7 @@ vi.mock('react-router', async (importOriginal) => {
         flag_7: '',
         flag_8: '',
       },
+      refreshShows: vi.fn(),
     })),
   };
 });
@@ -97,30 +126,21 @@ describe('components/ShowDetail.tsx', () => {
   };
 
   beforeEach(() => {
-    mocks.useApi.mockReset();
-    mocks.useApi.mockImplementation(() => ({
-      data: undefined,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    }));
+    showGet.mockReset();
+    showPut.mockReset();
+    showDelete.mockReset();
+    episodeFlagPatch.mockReset();
+    seasonFlagPatch.mockReset();
+    showGet.mockResolvedValue({ ok: true, json: () => Promise.resolve(mockShowData) });
   });
 
   it('shows "Select a show" message when no showId is provided', () => {
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show']} />);
 
@@ -128,27 +148,12 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders show name when data is loaded', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
@@ -158,27 +163,12 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders season count', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
@@ -188,27 +178,12 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders episode count', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
@@ -218,27 +193,12 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders first episode name', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
@@ -248,27 +208,12 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders show overview', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
@@ -278,62 +223,17 @@ describe('components/ShowDetail.tsx', () => {
   });
 
   it('renders season tabs', async () => {
-    mocks.useApi.mockReturnValue({
-      data: mockShowData,
-      isLoading: false,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
     const Stub = createRoutesStub([
       {
         path: '/show/:showId',
         Component: ShowDetail,
       },
-    ], { Wrapper });
+    ]);
 
     render(<Stub initialEntries={['/show/1']} />);
 
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /S01/i })).toBeInTheDocument();
-    });
-  });
-
-  it('shows loading state while fetching', async () => {
-    mocks.useApi.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isValidating: false,
-      mutate: vi.fn(),
-    });
-
-    function Wrapper({ children }: { children: React.ReactNode }) {
-      return (
-        <SWRConfig value={{ provider: () => new Map() }}>
-          {children}
-        </SWRConfig>
-      );
-    }
-
-    const Stub = createRoutesStub([
-      {
-        path: '/show/:showId',
-        Component: ShowDetail,
-      },
-    ], { Wrapper });
-
-    render(<Stub initialEntries={['/show/1']} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
   });
 });

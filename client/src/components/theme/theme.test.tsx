@@ -5,7 +5,6 @@ import {ThemeProvider} from '@/components/theme/ThemeProvider.tsx';
 import {AuthProvider} from '@/components/auth/AuthProvider.tsx';
 import {useTheme} from "@/components/theme/useTheme.tsx";
 
-// Create mock functions with getters for vi.mock hoisting
 const mocks: {
   sessionGet: ReturnType<typeof vi.fn>;
   themePatch: ReturnType<typeof vi.fn>;
@@ -14,20 +13,19 @@ const mocks: {
   themePatch: vi.fn(),
 };
 
-// Mock the API
+function mockResponse(data: unknown) {
+  return { ok: true, json: () => Promise.resolve(data) };
+}
+
 vi.mock('@/lib/api.tsx', () => ({
   get api() {
     return {
       session: {
-        get $get() {
-          return mocks.sessionGet;
-        },
+        $get: mocks.sessionGet,
       },
       settings: {
         theme: {
-          get $patch() {
-            return mocks.themePatch;
-          },
+          $patch: mocks.themePatch,
         },
       },
     };
@@ -46,11 +44,7 @@ describe('lib/ThemeProvider.tsx', () => {
 
   describe('ThemeProvider', () => {
     it('applies dark class to document by default', () => {
-      // Auth will fail, so theme stays at default (dark)
-      mocks.sessionGet.mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
-      });
+      mocks.sessionGet.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Unauthorized' }) });
 
       render(
         <AuthProvider>
@@ -64,10 +58,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('loads theme from server when authenticated', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: false }),
-      });
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: false }));
 
       render(
         <AuthProvider>
@@ -85,10 +76,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('keeps default theme when server returns no theme preference', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 } }), // No darkTheme
-      });
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 } }));
 
       render(
         <AuthProvider>
@@ -104,11 +92,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('setDarkTheme updates local state optimistically', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: true }),
-      });
-
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: true }));
       mocks.themePatch.mockResolvedValue(new Response(null, { status: 200 }));
 
       render(
@@ -119,7 +103,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial dark theme
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -127,17 +110,12 @@ describe('lib/ThemeProvider.tsx', () => {
       const setDarkThemeBtn = screen.getByTestId('setDarkTheme-btn');
       await userEvent.click(setDarkThemeBtn);
 
-      // State should update immediately (optimistic)
       expect(screen.getByTestId('darkTheme')).toHaveTextContent('false');
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
 
     it('sends PATCH to server on theme change', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: true }),
-      });
-
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: true }));
       mocks.themePatch.mockResolvedValue(new Response(null, { status: 200 }));
 
       render(
@@ -148,7 +126,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial dark theme
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -156,7 +133,6 @@ describe('lib/ThemeProvider.tsx', () => {
       const setDarkThemeBtn = screen.getByTestId('setDarkTheme-btn');
       await userEvent.click(setDarkThemeBtn);
 
-      // Verify the API was called
       await waitFor(() => {
         expect(mocks.themePatch).toHaveBeenCalledWith({
           json: { darkTheme: false },
@@ -165,11 +141,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('preserves local state on server error', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: true }),
-      });
-
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: true }));
       mocks.themePatch.mockRejectedValue(new Error('Network error'));
 
       render(
@@ -180,7 +152,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial dark theme
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -188,16 +159,11 @@ describe('lib/ThemeProvider.tsx', () => {
       const setDarkThemeBtn = screen.getByTestId('setDarkTheme-btn');
       await userEvent.click(setDarkThemeBtn);
 
-      // State should update optimistically despite server error
       expect(screen.getByTestId('darkTheme')).toHaveTextContent('false');
     });
 
     it('toggleDarkTheme toggles the theme', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: true }),
-      });
-
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: true }));
       mocks.themePatch.mockResolvedValue(new Response(null, { status: 200 }));
 
       render(
@@ -208,7 +174,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial dark theme
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -220,10 +185,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('setThemeState updates only local state without server call', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1 }, darkTheme: true }),
-      });
+      mocks.sessionGet.mockResolvedValue(mockResponse({ user: { id: 1 }, darkTheme: true }));
 
       render(
         <AuthProvider>
@@ -233,7 +195,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Wait for initial dark theme
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -246,10 +207,7 @@ describe('lib/ThemeProvider.tsx', () => {
     });
 
     it('does not load theme when not authenticated', async () => {
-      mocks.sessionGet.mockResolvedValue({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
-      });
+      mocks.sessionGet.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Unauthorized' }) });
 
       render(
         <AuthProvider>
@@ -259,7 +217,6 @@ describe('lib/ThemeProvider.tsx', () => {
         </AuthProvider>
       );
 
-      // Should keep default theme (dark)
       await waitFor(() => {
         expect(screen.getByTestId('darkTheme')).toHaveTextContent('true');
       });
@@ -282,7 +239,6 @@ describe('lib/ThemeProvider.tsx', () => {
   });
 });
 
-// Helper component to consume theme context
 function ThemeConsumer() {
   const { darkTheme, setDarkTheme, toggleDarkTheme, setThemeState } = useTheme();
 
